@@ -1,0 +1,41 @@
+// select polygon around the river to illustrate and rename aoi
+// run the script - animation of waterbody should appear in the console
+// appears best on oxbow lakes
+// examples of areas are the South Saskechewan River (just south of Saskatoon)
+//     & Ucayali River in Peru near Pecaya
+// dataset: JRC Yearly Water Classification History, v1.1 [deprecated]
+
+
+// below to double check correct number of year in analysis
+//print(ee.ImageCollection('JRC/GSW1_3/YearlyHistory').filterDate('1983-01-01', '2020-01-01'))
+
+var col = ee.ImageCollection('JRC/GSW1_3/YearlyHistory')
+       .filterDate('1983-01-01', '2020-01-01')
+       // system:timestart does not exist for year 2020 - need to exclude it 
+       .map(function(img){
+  var year = img.date().get('year');
+  var yearImg = img.gte(2).multiply(year);
+  var despeckle = yearImg.connectedPixelCount(15,true).eq(15);
+  return yearImg.updateMask(despeckle).selfMask().set('year', year)});
+
+function appendReverse(col) {
+ return col.merge(col.sort('year', false));
+}
+
+var bgColor = 'FFFFFF'; // Assign white to background pixels.
+var riverColor = '0D0887'; // Assign blue to river pixels.
+var annualCol = col.map(function(img) {
+ return img.unmask(0)
+ .visualize({min: 0, max: 1, palette: [bgColor, riverColor]})
+ .set('year', img.get('year'));
+});
+var basicAnimation = appendReverse(annualCol);
+
+
+var videoArgs = {
+ dimensions:
+ 600, // Max dimension (pixels), min dimension is proportionally scaled.
+ region: aoi,
+ framesPerSecond: 10
+};
+print(ui.Thumbnail(basicAnimation, videoArgs));
